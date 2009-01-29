@@ -6,7 +6,7 @@
 typedef struct bloom
 {
 	int fd;
-	unsigned char *map;
+	uint8_t *map;
 } bloom_t;
 
 int bloom_create(const char *fn);
