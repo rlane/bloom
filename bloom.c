@@ -10,10 +10,10 @@
 #include "bloom.h"
 
 #define PAGE_SIZE 4096
-#define HEADER_LEN 64
+#define TABLE_SIZE (1<<27)
 #define NUM_IDXS 4
 
-int bloom_create(const char *fn, size_t len)
+int bloom_create(const char *fn)
 {
 	int fd = creat(fn, S_IRUSR|S_IWUSR);
 	if (fd < 0) {
@@ -21,17 +21,10 @@ int bloom_create(const char *fn, size_t len)
 		abort();
 	}
 
-	lseek(fd, len + PAGE_SIZE, SEEK_SET);
+	lseek(fd, TABLE_SIZE, SEEK_SET);
 
 	char z = 0;
 	if (write(fd, &z, 1) < 0) {
-		perror("write");
-		abort();
-	}
-
-	lseek(fd, 0, SEEK_SET);
-
-	if (write(fd, &len, sizeof(len)) < 0) {
 		perror("write");
 		abort();
 	}
@@ -43,7 +36,6 @@ int bloom_create(const char *fn, size_t len)
 
 bloom_t *bloom_open(const char *fn)
 {
-	uint8_t hdr[HEADER_LEN];
 	bloom_t *b;
 	
 	b = malloc(sizeof(*b));
@@ -55,14 +47,7 @@ bloom_t *bloom_open(const char *fn)
 		abort();
 	}
 
-	if (read(b->fd, hdr, sizeof(hdr)) < sizeof(hdr)) {
-		perror("read");
-		abort();
-	}
-
-	b->len = *(size_t*)(hdr);
-
-	b->map = mmap(NULL, b->len + PAGE_SIZE, PROT_READ|PROT_WRITE, MAP_SHARED, b->fd, PAGE_SIZE);
+	b->map = mmap(NULL, TABLE_SIZE, PROT_READ|PROT_WRITE, MAP_SHARED, b->fd, 0);
 	if (b->map == MAP_FAILED) {
 		perror("mmap");
 		abort();
@@ -91,7 +76,7 @@ void bloom_insert(bloom_t *b, const uint8_t *key, size_t key_len)
 	uint32_t idxs[NUM_IDXS];
 	key2idxs(key, key_len, idxs, NUM_IDXS);
 	for (i = 0; i < NUM_IDXS; i++) {
-		b->map[idxs[i] % b->len] = 1;
+		b->map[idxs[i] % TABLE_SIZE] = 1;
 	}
 }
 
@@ -101,7 +86,7 @@ int bloom_check(bloom_t *b, const uint8_t *key, size_t key_len)
 	uint32_t idxs[NUM_IDXS];
 	key2idxs(key, key_len, idxs, NUM_IDXS);
 	for (i = 0; i < NUM_IDXS; i++) {
-		if (b->map[idxs[i] % b->len] != 1)
+		if (b->map[idxs[i] % TABLE_SIZE] != 1)
 			return 0;
 	}
 	return 1;
@@ -109,7 +94,7 @@ int bloom_check(bloom_t *b, const uint8_t *key, size_t key_len)
 
 void bloom_close(bloom_t *b)
 {
-	munmap(b->map, b->len + PAGE_SIZE);
+	munmap(b->map, TABLE_SIZE);
 	close(b->fd);
 	free(b);
 }

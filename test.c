@@ -42,9 +42,8 @@ int main(int argc, char** argv)
 	char *key;
 	char *fn = "/tmp/test_bloom_filter";
 
-	bloom_create(fn, 4096 * 128);
+	bloom_create(fn);
 	b = bloom_open(fn);
-	printf("loaded bloom filter of size %d\n", b->len);
 
 	nic("foo1234567");
 	ic("foo1234567");
