@@ -83,7 +83,7 @@ void bloom_insert(bloom_t *b, const char *key, size_t key_len)
 	int idxs[NUM_IDXS];
 	key2idxs(key, key_len, idxs, NUM_IDXS);
 	for (i = 0; i < NUM_IDXS; i++) {
-		b->map[idxs[i]] = 1;
+		b->map[idxs[i] % b->len] = 1;
 	}
 }
 
@@ -93,7 +93,7 @@ int bloom_check(bloom_t *b, char *key, size_t key_len)
 	int idxs[NUM_IDXS];
 	key2idxs(key, key_len, idxs, NUM_IDXS);
 	for (i = 0; i < NUM_IDXS; i++) {
-		if (b->map[idxs[i]] != 1)
+		if (b->map[idxs[i] % b->len] != 1)
 			return 0;
 	}
 	return 1;
