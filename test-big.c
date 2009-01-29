@@ -14,7 +14,7 @@ int main(int argc, char** argv)
 	char *fn = "/tmp/test_bloom_filter";
 	bloom_t *b;
 	uint8_t *keys;
-	const int n = 1000000;
+	const int n = 10000000;
 	const int key_len = 20;
 	int i;
 	int stat_before = 0;

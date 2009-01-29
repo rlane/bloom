@@ -10,7 +10,9 @@
 #include "bloom.h"
 
 #define PAGE_SIZE 4096
-#define TABLE_SIZE (1<<25)
+#define TABLE_SIZE (1<<27)
+#define BYTE_SIZE 8
+#define TABLE_BYTES TABLE_SIZE/BYTE_SIZE
 #define NUM_IDXS 4
 
 int bloom_create(const char *fn)
@@ -21,7 +23,7 @@ int bloom_create(const char *fn)
 		abort();
 	}
 
-	lseek(fd, TABLE_SIZE, SEEK_SET);
+	lseek(fd, TABLE_BYTES, SEEK_SET);
 
 	char z = 0;
 	if (write(fd, &z, 1) < 0) {
@@ -47,14 +49,14 @@ bloom_t *bloom_open(const char *fn)
 		abort();
 	}
 
-	b->map = mmap(NULL, TABLE_SIZE, PROT_READ|PROT_WRITE, MAP_SHARED, b->fd, 0);
+	b->map = mmap(NULL, TABLE_BYTES, PROT_READ|PROT_WRITE, MAP_SHARED, b->fd, 0);
 	if (b->map == MAP_FAILED) {
 		perror("mmap");
 		abort();
 	}
 
 #ifdef USE_MLOCK
-	if (mlock(b->map, TABLE_SIZE) < 0) {
+	if (mlock(b->map, TABLE_BYTES) < 0) {
 		perror("mlock");
 		abort();
 	}
@@ -83,7 +85,10 @@ void bloom_insert(bloom_t *b, const uint8_t *key, size_t key_len)
 	uint32_t idxs[NUM_IDXS];
 	key2idxs(key, key_len, idxs, NUM_IDXS);
 	for (i = 0; i < NUM_IDXS; i++) {
-		b->map[idxs[i] % TABLE_SIZE] = 1;
+		uint32_t wrapped = idxs[i] % TABLE_SIZE;
+		uint32_t byte_idx = wrapped / BYTE_SIZE;
+		uint32_t bit_idx = wrapped % BYTE_SIZE;
+		b->map[byte_idx] |= (1 << bit_idx);
 	}
 }
 
@@ -93,7 +98,10 @@ int bloom_check(bloom_t *b, const uint8_t *key, size_t key_len)
 	uint32_t idxs[NUM_IDXS];
 	key2idxs(key, key_len, idxs, NUM_IDXS);
 	for (i = 0; i < NUM_IDXS; i++) {
-		if (b->map[idxs[i] % TABLE_SIZE] != 1)
+		uint32_t wrapped = idxs[i] % TABLE_SIZE;
+		uint32_t byte_idx = wrapped / BYTE_SIZE;
+		uint32_t bit_idx = wrapped % BYTE_SIZE;
+		if (!(b->map[byte_idx] & (1 << bit_idx)))
 			return 0;
 	}
 	return 1;
@@ -102,13 +110,13 @@ int bloom_check(bloom_t *b, const uint8_t *key, size_t key_len)
 void bloom_close(bloom_t *b)
 {
 #ifdef USE_MLOCK
-	if (mlock(b->map, TABLE_SIZE) < 0) {
+	if (mlock(b->map, TABLE_BYTES) < 0) {
 		perror("munlock");
 		abort();
 	}
 #endif
 
-	munmap(b->map, TABLE_SIZE);
+	munmap(b->map, TABLE_BYTES);
 	close(b->fd);
 	free(b);
 }
