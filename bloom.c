@@ -5,11 +5,12 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <openssl/md5.h>
 #include "bloom.h"
 
 #define PAGE_SIZE 4096
 #define HEADER_LEN 64
-#define NUM_IDXS 8
+#define NUM_IDXS 4
 
 int bloom_create(const char *fn, size_t len)
 {
@@ -71,9 +72,15 @@ bloom_t *bloom_open(const char *fn)
 
 static void key2idxs(const char *key, size_t key_len, int *idxs, int n)
 {
+	unsigned char md5[MD5_DIGEST_LENGTH];
+	MD5_CTX c;
+	MD5_Init(&c);
+	MD5_Update(&c, key, key_len);
+	MD5_Final(md5, &c);
+
 	int i;
 	for (i = 0; i < n; i++) {
-		idxs[i] = (i < key_len) ? key[i] : 0;
+		idxs[i] = ((unsigned int*)md5)[i];
 	}
 }
 
