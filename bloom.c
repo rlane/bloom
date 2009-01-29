@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <unistd.h>
 #include <sys/mman.h>
 #include <sys/types.h>
@@ -42,7 +43,7 @@ int bloom_create(const char *fn, size_t len)
 
 bloom_t *bloom_open(const char *fn)
 {
-	char hdr[HEADER_LEN];
+	uint8_t hdr[HEADER_LEN];
 	bloom_t *b;
 	
 	b = malloc(sizeof(*b));
@@ -70,9 +71,9 @@ bloom_t *bloom_open(const char *fn)
 	return b;
 }
 
-static void key2idxs(const char *key, size_t key_len, int *idxs, int n)
+static void key2idxs(const uint8_t *key, size_t key_len, uint32_t *idxs, int n)
 {
-	unsigned char md5[MD5_DIGEST_LENGTH];
+	uint8_t md5[MD5_DIGEST_LENGTH];
 	MD5_CTX c;
 	MD5_Init(&c);
 	MD5_Update(&c, key, key_len);
@@ -80,24 +81,24 @@ static void key2idxs(const char *key, size_t key_len, int *idxs, int n)
 
 	int i;
 	for (i = 0; i < n; i++) {
-		idxs[i] = ((unsigned int*)md5)[i];
+		idxs[i] = ((uint32_t*)md5)[i];
 	}
 }
 
-void bloom_insert(bloom_t *b, const char *key, size_t key_len)
+void bloom_insert(bloom_t *b, const uint8_t *key, size_t key_len)
 {
 	int i;
-	int idxs[NUM_IDXS];
+	uint32_t idxs[NUM_IDXS];
 	key2idxs(key, key_len, idxs, NUM_IDXS);
 	for (i = 0; i < NUM_IDXS; i++) {
 		b->map[idxs[i] % b->len] = 1;
 	}
 }
 
-int bloom_check(bloom_t *b, char *key, size_t key_len)
+int bloom_check(bloom_t *b, const uint8_t *key, size_t key_len)
 {
 	int i;
-	int idxs[NUM_IDXS];
+	uint32_t idxs[NUM_IDXS];
 	key2idxs(key, key_len, idxs, NUM_IDXS);
 	for (i = 0; i < NUM_IDXS; i++) {
 		if (b->map[idxs[i] % b->len] != 1)
