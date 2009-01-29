@@ -9,6 +9,7 @@
 
 #define PAGE_SIZE 4096
 #define HEADER_LEN 64
+#define NUM_IDXS 8
 
 int bloom_create(const char *fn, size_t len)
 {
@@ -66,6 +67,36 @@ bloom_t *bloom_open(const char *fn)
 	}
 
 	return b;
+}
+
+static void key2idxs(const char *key, size_t key_len, int *idxs, int n)
+{
+	int i;
+	for (i = 0; i < n; i++) {
+		idxs[i] = (i < key_len) ? key[i] : 0;
+	}
+}
+
+void bloom_insert(bloom_t *b, const char *key, size_t key_len)
+{
+	int i;
+	int idxs[NUM_IDXS];
+	key2idxs(key, key_len, idxs, NUM_IDXS);
+	for (i = 0; i < NUM_IDXS; i++) {
+		b->map[idxs[i]] = 1;
+	}
+}
+
+int bloom_check(bloom_t *b, char *key, size_t key_len)
+{
+	int i;
+	int idxs[NUM_IDXS];
+	key2idxs(key, key_len, idxs, NUM_IDXS);
+	for (i = 0; i < NUM_IDXS; i++) {
+		if (b->map[idxs[i]] != 1)
+			return 0;
+	}
+	return 1;
 }
 
 void bloom_close(bloom_t *b)
