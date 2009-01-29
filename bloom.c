@@ -10,7 +10,7 @@
 #include "bloom.h"
 
 #define PAGE_SIZE 4096
-#define TABLE_SIZE (1<<27)
+#define TABLE_SIZE (1<<25)
 #define NUM_IDXS 4
 
 int bloom_create(const char *fn)
@@ -53,6 +53,13 @@ bloom_t *bloom_open(const char *fn)
 		abort();
 	}
 
+#ifdef USE_MLOCK
+	if (mlock(b->map, TABLE_SIZE) < 0) {
+		perror("mlock");
+		abort();
+	}
+#endif
+
 	return b;
 }
 
@@ -94,6 +101,13 @@ int bloom_check(bloom_t *b, const uint8_t *key, size_t key_len)
 
 void bloom_close(bloom_t *b)
 {
+#ifdef USE_MLOCK
+	if (mlock(b->map, TABLE_SIZE) < 0) {
+		perror("munlock");
+		abort();
+	}
+#endif
+
 	munmap(b->map, TABLE_SIZE);
 	close(b->fd);
 	free(b);
