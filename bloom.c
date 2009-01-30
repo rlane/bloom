@@ -19,7 +19,7 @@
 
 typedef uint16_t idx_t;
 
-unsigned int MurmurHash2 ( const void * key, int len, unsigned int seed );
+static inline unsigned int MurmurHash2 ( const void * key, int len, unsigned int seed );
 
 int bloom_create(const char *fn)
 {
@@ -96,7 +96,7 @@ fail_malloc:
 	return NULL;
 }
 
-static void key2idxs(const uint8_t *key, size_t key_len, idx_t *idxs, int n)
+static inline void key2idxs(const uint8_t *key, size_t key_len, idx_t *idxs, int n)
 {
 	int i;
 	int hash = 0xdeadbeef;
@@ -171,7 +171,7 @@ void bloom_close(bloom_t *b)
 // 2. It will not produce the same results on little-endian and big-endian
 //    machines.
 
-unsigned int MurmurHash2 ( const void * key, int len, unsigned int seed )
+static inline unsigned int MurmurHash2 ( const void * key, int len, unsigned int seed )
 {
 	// 'm' and 'r' are mixing constants generated offline.
 	// They're not really 'magic', they just happen to work well.

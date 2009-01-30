@@ -1,4 +1,4 @@
-CFLAGS=-O2
+CFLAGS=-O3 -Wall
 
 all: test test-big
 
