@@ -17,23 +17,34 @@
 
 int bloom_create(const char *fn)
 {
-	int fd = creat(fn, S_IRUSR|S_IWUSR);
+	int fd;
+	char z;
+	
+	fd = creat(fn, S_IRUSR|S_IWUSR);
 	if (fd < 0) {
 		perror("creat");
-		abort();
+		goto fail_creat;
 	}
 
-	lseek(fd, TABLE_BYTES, SEEK_SET);
+	if (lseek(fd, TABLE_BYTES, SEEK_SET) < 0) {
+		perror("seek");
+		goto fail_lseek;
+	}
 
-	char z = 0;
+	z = 0;
 	if (write(fd, &z, 1) < 0) {
 		perror("write");
-		abort();
+		goto fail_write;
 	}
 
 	close(fd);
 
 	return 0;
+
+fail_write:
+fail_lseek:
+fail_creat:
+	return -1;
 }
 
 bloom_t *bloom_open(const char *fn)
@@ -41,28 +52,42 @@ bloom_t *bloom_open(const char *fn)
 	bloom_t *b;
 	
 	b = malloc(sizeof(*b));
-	if (!b) abort();
+	if (!b) goto fail_malloc;
 
 	b->fd = open(fn, O_RDWR);
 	if (b->fd < 0) {
 		perror("open");
-		abort();
+		goto fail_open;
 	}
 
 	b->map = mmap(NULL, TABLE_BYTES, PROT_READ|PROT_WRITE, MAP_SHARED, b->fd, 0);
 	if (b->map == MAP_FAILED) {
 		perror("mmap");
-		abort();
+		goto fail_mmap;
 	}
 
 #ifdef USE_MLOCK
 	if (mlock(b->map, TABLE_BYTES) < 0) {
 		perror("mlock");
-		abort();
+		goto fail_mlock;
 	}
 #endif
 
 	return b;
+
+#ifdef USE_MLOCK
+fail_mlock:
+	munmap(b->map, TABLE_BYTES);
+#endif
+
+fail_mmap:
+	close(b->fd);
+
+fail_open:
+	free(b);
+
+fail_malloc:
+	return NULL;
 }
 
 static void key2idxs(const uint8_t *key, size_t key_len, uint32_t *idxs, int n)
