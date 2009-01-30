@@ -6,6 +6,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <string.h>
 #include "bloom.h"
 
 #define FILE_SIZE (1<<25)
@@ -140,6 +141,12 @@ int bloom_check(bloom_t *b, const uint8_t *key, size_t key_len)
 			return 0;
 	}
 	return 1;
+}
+
+void bloom_sweep(bloom_t *b, unsigned long i)
+{
+	i = i % NUM_BUCKETS;
+	memset(idx2bucket(b,i), 0, PAGE_SIZE);
 }
 
 void bloom_close(bloom_t *b)

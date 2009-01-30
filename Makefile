@@ -1,6 +1,6 @@
 CFLAGS=-O3 -Wall
 
-all: test test-big
+all: test test-big sweep
 
 test: test.c bloom.c bloom.h
 	$(CC) test.c bloom.c -lssl -o test
@@ -8,5 +8,8 @@ test: test.c bloom.c bloom.h
 test-big: test-big.c bloom.c bloom.h
 	$(CC) test-big.c bloom.c -lssl -o test-big
 
+sweep: sweep.c bloom.c bloom.h
+	$(CC) sweep.c bloom.c -o sweep
+
 clean:
-	rm -rf test test-big bench
+	rm -rf test test-big bench sweep
