@@ -9,10 +9,11 @@
 #include <openssl/md5.h>
 #include "bloom.h"
 
-#define PAGE_SIZE 4096
-#define TABLE_SIZE (1<<27)
+#define FILE_SIZE (1<<25)
+#define PAGE_SIZE (1<<12)
 #define BYTE_SIZE 8
-#define TABLE_BYTES TABLE_SIZE/BYTE_SIZE
+#define NUM_BUCKETS (FILE_SIZE/PAGE_SIZE)
+#define BITS_PER_BUCKET (PAGE_SIZE*BYTE_SIZE)
 #define NUM_IDXS 4
 
 int bloom_create(const char *fn)
@@ -26,7 +27,7 @@ int bloom_create(const char *fn)
 		goto fail_creat;
 	}
 
-	if (lseek(fd, TABLE_BYTES, SEEK_SET) < 0) {
+	if (lseek(fd, FILE_SIZE, SEEK_SET) < 0) {
 		perror("seek");
 		goto fail_lseek;
 	}
@@ -60,14 +61,14 @@ bloom_t *bloom_open(const char *fn)
 		goto fail_open;
 	}
 
-	b->map = mmap(NULL, TABLE_BYTES, PROT_READ|PROT_WRITE, MAP_SHARED, b->fd, 0);
+	b->map = mmap(NULL, FILE_SIZE, PROT_READ|PROT_WRITE, MAP_SHARED, b->fd, 0);
 	if (b->map == MAP_FAILED) {
 		perror("mmap");
 		goto fail_mmap;
 	}
 
 #ifdef USE_MLOCK
-	if (mlock(b->map, TABLE_BYTES) < 0) {
+	if (mlock(b->map, FILE_SIZE) < 0) {
 		perror("mlock");
 		goto fail_mlock;
 	}
@@ -77,7 +78,7 @@ bloom_t *bloom_open(const char *fn)
 
 #ifdef USE_MLOCK
 fail_mlock:
-	munmap(b->map, TABLE_BYTES);
+	munmap(b->map, FILE_SIZE);
 #endif
 
 fail_mmap:
@@ -108,12 +109,17 @@ void bloom_insert(bloom_t *b, const uint8_t *key, size_t key_len)
 {
 	int i;
 	uint32_t idxs[NUM_IDXS];
+	uint32_t wrapped, byte_idx, bit_idx;
+	uint8_t *bucket;
+
 	key2idxs(key, key_len, idxs, NUM_IDXS);
-	for (i = 0; i < NUM_IDXS; i++) {
-		uint32_t wrapped = idxs[i] % TABLE_SIZE;
-		uint32_t byte_idx = wrapped / BYTE_SIZE;
-		uint32_t bit_idx = wrapped % BYTE_SIZE;
-		b->map[byte_idx] |= (1 << bit_idx);
+	bucket = b->map + (idxs[0] % NUM_BUCKETS) * PAGE_SIZE;
+
+	for (i = 1; i < NUM_IDXS; i++) {
+		wrapped = idxs[i] % BITS_PER_BUCKET;
+		byte_idx = wrapped / BYTE_SIZE;
+		bit_idx = wrapped % BYTE_SIZE;
+		bucket[byte_idx] |= (1 << bit_idx);
 	}
 }
 
@@ -121,12 +127,17 @@ int bloom_check(bloom_t *b, const uint8_t *key, size_t key_len)
 {
 	int i;
 	uint32_t idxs[NUM_IDXS];
+	uint32_t wrapped, byte_idx, bit_idx;
+	uint8_t *bucket;
+
 	key2idxs(key, key_len, idxs, NUM_IDXS);
-	for (i = 0; i < NUM_IDXS; i++) {
-		uint32_t wrapped = idxs[i] % TABLE_SIZE;
-		uint32_t byte_idx = wrapped / BYTE_SIZE;
-		uint32_t bit_idx = wrapped % BYTE_SIZE;
-		if (!(b->map[byte_idx] & (1 << bit_idx)))
+	bucket = b->map + (idxs[0] % NUM_BUCKETS) * PAGE_SIZE;
+
+	for (i = 1; i < NUM_IDXS; i++) {
+		wrapped = idxs[i] % BITS_PER_BUCKET;
+		byte_idx = wrapped / BYTE_SIZE;
+		bit_idx = wrapped % BYTE_SIZE;
+		if (!(bucket[byte_idx] & (1 << bit_idx)))
 			return 0;
 	}
 	return 1;
@@ -135,13 +146,13 @@ int bloom_check(bloom_t *b, const uint8_t *key, size_t key_len)
 void bloom_close(bloom_t *b)
 {
 #ifdef USE_MLOCK
-	if (mlock(b->map, TABLE_BYTES) < 0) {
+	if (mlock(b->map, FILE_SIZE) < 0) {
 		perror("munlock");
 		abort();
 	}
 #endif
 
-	munmap(b->map, TABLE_BYTES);
+	munmap(b->map, FILE_SIZE);
 	close(b->fd);
 	free(b);
 }
