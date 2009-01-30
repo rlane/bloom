@@ -108,38 +108,29 @@ static void key2idxs(const uint8_t *key, size_t key_len, idx_t *idxs, int n)
 	}
 }
 
+#define EACH_IDX(key,key_len)\
+	int i;\
+	idx_t idxs[NUM_IDXS];\
+	idx_t wrapped, byte_idx, bit_idx;\
+	uint8_t *bucket;\
+	key2idxs(key, key_len, idxs, NUM_IDXS);\
+	bucket = b->map + (idxs[0] % NUM_BUCKETS) * PAGE_SIZE;\
+	for (i = 1;\
+		wrapped = idxs[i] % BITS_PER_BUCKET,\
+		byte_idx = wrapped / BYTE_SIZE,\
+		bit_idx = wrapped % BYTE_SIZE,\
+		i < NUM_IDXS; i++)
+
 void bloom_insert(bloom_t *b, const uint8_t *key, size_t key_len)
 {
-	int i;
-	idx_t idxs[NUM_IDXS];
-	idx_t wrapped, byte_idx, bit_idx;
-	uint8_t *bucket;
-
-	key2idxs(key, key_len, idxs, NUM_IDXS);
-	bucket = b->map + (idxs[0] % NUM_BUCKETS) * PAGE_SIZE;
-
-	for (i = 1; i < NUM_IDXS; i++) {
-		wrapped = idxs[i] % BITS_PER_BUCKET;
-		byte_idx = wrapped / BYTE_SIZE;
-		bit_idx = wrapped % BYTE_SIZE;
+	EACH_IDX(key,key_len) {
 		bucket[byte_idx] |= (1 << bit_idx);
 	}
 }
 
 int bloom_check(bloom_t *b, const uint8_t *key, size_t key_len)
 {
-	int i;
-	idx_t idxs[NUM_IDXS];
-	idx_t wrapped, byte_idx, bit_idx;
-	uint8_t *bucket;
-
-	key2idxs(key, key_len, idxs, NUM_IDXS);
-	bucket = b->map + (idxs[0] % NUM_BUCKETS) * PAGE_SIZE;
-
-	for (i = 1; i < NUM_IDXS; i++) {
-		wrapped = idxs[i] % BITS_PER_BUCKET;
-		byte_idx = wrapped / BYTE_SIZE;
-		bit_idx = wrapped % BYTE_SIZE;
+	EACH_IDX(key,key_len) {
 		if (!(bucket[byte_idx] & (1 << bit_idx)))
 			return 0;
 	}
