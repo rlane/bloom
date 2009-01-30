@@ -13,7 +13,9 @@
 #define BYTE_SIZE 8
 #define NUM_BUCKETS (FILE_SIZE/PAGE_SIZE)
 #define BITS_PER_BUCKET (PAGE_SIZE*BYTE_SIZE)
-#define NUM_IDXS 8
+#ifndef NUM_IDXS
+#define NUM_IDXS 16
+#endif
 
 typedef uint16_t idx_t;
 
