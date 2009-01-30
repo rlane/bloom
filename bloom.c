@@ -160,6 +160,7 @@ void bloom_close(bloom_t *b)
 	free(b);
 }
 
+// http://murmurhash.googlepages.com/
 //-----------------------------------------------------------------------------
 // MurmurHash2, by Austin Appleby
 
