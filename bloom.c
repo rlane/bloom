@@ -108,13 +108,18 @@ static void key2idxs(const uint8_t *key, size_t key_len, idx_t *idxs, int n)
 	}
 }
 
+static uint8_t *idx2bucket(bloom_t *b, idx_t idx)
+{
+	return b->map + (idx % NUM_BUCKETS) * PAGE_SIZE;
+}
+
 #define EACH_IDX(key,key_len)\
 	int i;\
 	idx_t idxs[NUM_IDXS];\
 	idx_t wrapped, byte_idx, bit_idx;\
 	uint8_t *bucket;\
 	key2idxs(key, key_len, idxs, NUM_IDXS);\
-	bucket = b->map + (idxs[0] % NUM_BUCKETS) * PAGE_SIZE;\
+	bucket = idx2bucket(b, idxs[0]);\
 	for (i = 1;\
 		wrapped = idxs[i] % BITS_PER_BUCKET,\
 		byte_idx = wrapped / BYTE_SIZE,\
