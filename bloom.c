@@ -14,7 +14,9 @@
 #define BYTE_SIZE 8
 #define NUM_BUCKETS (FILE_SIZE/PAGE_SIZE)
 #define BITS_PER_BUCKET (PAGE_SIZE*BYTE_SIZE)
-#define NUM_IDXS 4
+#define NUM_IDXS 8
+
+typedef uint16_t idx_t;
 
 int bloom_create(const char *fn)
 {
@@ -91,7 +93,7 @@ fail_malloc:
 	return NULL;
 }
 
-static void key2idxs(const uint8_t *key, size_t key_len, uint32_t *idxs, int n)
+static void key2idxs(const uint8_t *key, size_t key_len, idx_t *idxs, int n)
 {
 	uint8_t md5[MD5_DIGEST_LENGTH];
 	MD5_CTX c;
@@ -101,15 +103,15 @@ static void key2idxs(const uint8_t *key, size_t key_len, uint32_t *idxs, int n)
 
 	int i;
 	for (i = 0; i < n; i++) {
-		idxs[i] = ((uint32_t*)md5)[i];
+		idxs[i] = ((idx_t*)md5)[i];
 	}
 }
 
 void bloom_insert(bloom_t *b, const uint8_t *key, size_t key_len)
 {
 	int i;
-	uint32_t idxs[NUM_IDXS];
-	uint32_t wrapped, byte_idx, bit_idx;
+	idx_t idxs[NUM_IDXS];
+	idx_t wrapped, byte_idx, bit_idx;
 	uint8_t *bucket;
 
 	key2idxs(key, key_len, idxs, NUM_IDXS);
@@ -126,8 +128,8 @@ void bloom_insert(bloom_t *b, const uint8_t *key, size_t key_len)
 int bloom_check(bloom_t *b, const uint8_t *key, size_t key_len)
 {
 	int i;
-	uint32_t idxs[NUM_IDXS];
-	uint32_t wrapped, byte_idx, bit_idx;
+	idx_t idxs[NUM_IDXS];
+	idx_t wrapped, byte_idx, bit_idx;
 	uint8_t *bucket;
 
 	key2idxs(key, key_len, idxs, NUM_IDXS);
