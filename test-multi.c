@@ -1,10 +1,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <openssl/rand.h>
 #include "bloom.h"
 
-struct drand48_data key_seed;
+#define INITIAL_SLEEP_TIME (3*1000*1000)
+
+unsigned int key_seed;
 
 void generate_key(uint8_t *key, int key_len)
 {
@@ -12,7 +13,7 @@ void generate_key(uint8_t *key, int key_len)
 	int c, i = 0;
 
 	while (i < key_len) {
-		lrand48_r(&key_seed, &result);
+		result = rand_r(&key_seed);
 		c = (i + sizeof(result) > key_len) ? (key_len - i) : sizeof(result);
 		memcpy(key+i, &result, c);
 		i += sizeof(result);
@@ -63,7 +64,7 @@ int main(int argc, char** argv)
 	bloom_create(fn);
 	b = bloom_open(fn);
 
-	srand48_r(42, &key_seed);
+	key_seed = 0xdeadbeef;
 	int pipefd[2];
 	pipe(pipefd);
 
@@ -75,7 +76,8 @@ int main(int argc, char** argv)
 		} else if (pid == 0) {
 			close(pipefd[0]);
 			srand(i);
-			usleep(1000);
+			fprintf(stderr, "child %d spawned\n", getpid());
+			usleep(INITIAL_SLEEP_TIME);
 			fprintf(stderr, "child %d starting\n", getpid());
 			child_inserted = insert_all(b, n, key_len, sleep_max);
 			fprintf(stderr, "child %d finished with subtotal %d\n", getpid(), child_inserted);
